@@ -20,6 +20,7 @@ const logger          = require('../utils/logger');
 const { computeFingerprint } = require('../middleware/auth');
 const { getConfig }   = require('../config/systemConfig');
 const CircuitBreaker  = require('../utils/circuitBreaker');
+const AppError        = require('../utils/appError');
 
 // Circuit breaker for email sending
 const mailBreaker = new CircuitBreaker(sendOtpEmail, { name: 'sendOtpEmail', failureThreshold: 3 });
@@ -103,23 +104,23 @@ class AuthService {
   async sendSignupOtp(data) {
     const { username, email, password, phone, role } = data;
 
-    if (!username || !password) throw Object.assign(new Error('Username and password are required.'), { statusCode: 400 });
-    if (!email)                 throw Object.assign(new Error('Email is required.'), { statusCode: 400 });
+    if (!username || !password) throw new AppError('Username and password are required.', 400);
+    if (!email)                 throw new AppError('Email is required.', 400);
 
     if (!phone || !/^0\d{10}$/.test(phone))
-      throw Object.assign(new Error('Valid 11-digit Pakistan phone number is required.'), { statusCode: 400 });
+      throw new AppError('Valid 11-digit Pakistan phone number is required.', 400);
     if (role === 'admin')
-      throw Object.assign(new Error('Admin accounts cannot be created via signup.'), { statusCode: 403 });
+      throw new AppError('Admin accounts cannot be created via signup.', 403);
 
     let signupRole = role || 'user';
     if (signupRole === 'donor') signupRole = 'user';
 
     const existing = await userRepository.findByEmailOrUsername(email);
-    if (existing) throw Object.assign(new Error('An account with these credentials already exists.'), { statusCode: 409 });
+    if (existing) throw new AppError('An account with these credentials already exists.', 409);
 
     // OTP send rate check
     const sendCount = await checkOtpSendRate(email);
-    if (sendCount > 3) throw Object.assign(new Error('Too many OTP requests. Please wait 1 hour before trying again.'), { statusCode: 429 });
+    if (sendCount > 3) throw new AppError('Too many OTP requests. Please wait 1 hour before trying again.', 429);
 
     const config    = await getConfig();
     const ttlMs     = (config.otpTtlMinutes || 10) * 60 * 1000;
@@ -150,32 +151,32 @@ class AuthService {
   }
 
   // ── Verify sign-up OTP ───────────────────────────────────────────────────────
-  async verifySignupOtp({ email, otp }) {
-    if (!email || !otp) throw Object.assign(new Error('Email and OTP are required.'), { statusCode: 400 });
+  async verifySignupOtp({ email, otp, req }) {
+    if (!email || !otp) throw new AppError('Email and OTP are required.', 400);
 
     const otpDoc = await otpRepository.findLatestByEmailAndPurpose(email, 'signup');
-    if (!otpDoc) throw Object.assign(new Error('OTP not found. Please request a new one.'), { statusCode: 404 });
+    if (!otpDoc) throw new AppError('OTP not found. Please request a new one.', 404);
 
     if (otpDoc.expiresAt.getTime() < Date.now()) {
       await otpDoc.deleteOne();
-      throw Object.assign(new Error('OTP expired. Please request again.'), { statusCode: 410 });
+      throw new AppError('OTP expired. Please request again.', 410);
     }
 
     const config = await getConfig();
     if (otpDoc.attempts >= (config.maxOtpAttempts || 3)) {
       await otpDoc.deleteOne();
-      throw Object.assign(new Error('Too many failed attempts. Please request a new OTP.'), { statusCode: 429 });
+      throw new AppError('Too many failed attempts. Please request a new OTP.', 429);
     }
 
     const isMatch = await bcrypt.compare(otp, otpDoc.otpHash);
     if (!isMatch) {
       otpDoc.attempts += 1;
       await otpDoc.save();
-      throw Object.assign(new Error('Invalid OTP.'), { statusCode: 401 });
+      throw new AppError('Invalid OTP.', 401);
     }
 
     if (otpDoc.payload?.role === 'admin')
-      throw Object.assign(new Error('Admin accounts cannot be created via signup.'), { statusCode: 403 });
+      throw new AppError('Admin accounts cannot be created via signup.', 403);
 
     const user = await userRepository.create({
       username:   otpDoc.payload.username,
@@ -187,40 +188,55 @@ class AuthService {
     });
 
     await otpRepository.deleteByEmailAndPurpose(email, 'signup');
-    return user;
+
+    // Automatically log in the user (Dual-token generation)
+    const fp           = req ? computeFingerprint(req) : '';
+    const accessToken  = generateAccessToken(user, fp);
+    const refreshToken = generateRefreshToken(user);
+    const refreshHash = await bcrypt.hash(refreshToken, 10);
+    
+    await userRepository.updateById(user._id, {
+      refreshTokenHash: refreshHash,
+      lastLoginAt:      new Date(),
+      lastLoginIp:      req?.ip,
+    });
+
+    await logAudit({ actor: user._id, action: 'login', req });
+
+    return { user, accessToken, refreshToken };
   }
 
   // ── Login ────────────────────────────────────────────────────────────────────
   async login({ identifier, password, req }) {
     const norm = (identifier || '').trim();
     if (!norm || !password)
-      throw Object.assign(new Error('Credentials are required.'), { statusCode: 400 });
+      throw new AppError('Credentials are required.', 400);
 
     // Check account lock (Redis-backed)
     const locked = await loginProtection.isLocked(norm);
     if (locked)
-      throw Object.assign(new Error('Account temporarily locked. Please try again in 15 minutes.'), { statusCode: 429 });
+      throw new AppError('Account temporarily locked. Please try again in 15 minutes.', 429);
 
     const user = await userRepository.findByEmailOrUsername(norm, true); // +password
 
     // Generic error — never reveal whether email exists
     if (!user) {
       await loginProtection.recordFailedAttempt(norm);
-      throw Object.assign(new Error('Invalid credentials.'), { statusCode: 401 });
+      throw new AppError('Invalid credentials.', 401);
     }
 
     const isMatch = comparePassword(password, user.password);
     if (!isMatch) {
       await loginProtection.recordFailedAttempt(norm);
       await logAudit({ actor: user._id, action: 'login_failed', req });
-      throw Object.assign(new Error('Invalid credentials.'), { statusCode: 401 });
+      throw new AppError('Invalid credentials.', 401);
     }
 
     if (!user.isVerified)
-      throw Object.assign(new Error('Please verify your email first.'), { statusCode: 403 });
+      throw new AppError('Please verify your email first.', 403);
 
     if (!user.isActive)
-      throw Object.assign(new Error('Account deactivated. Please contact support.'), { statusCode: 403 });
+      throw new AppError('Account deactivated. Please contact support.', 403);
 
     // Successful login — clear lockout
     await loginProtection.clearAttempts(norm);
@@ -245,21 +261,21 @@ class AuthService {
   // ── Refresh tokens ───────────────────────────────────────────────────────────
   async refreshTokens({ refreshToken, req }) {
     if (!refreshToken)
-      throw Object.assign(new Error('Refresh token missing.'), { statusCode: 401 });
+      throw new AppError('Refresh token missing.', 401);
 
     let decoded;
     try {
       decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
     } catch {
-      throw Object.assign(new Error('Invalid or expired refresh token.'), { statusCode: 401 });
+      throw new AppError('Invalid or expired refresh token.', 401);
     }
 
     const user = await userRepository.findById(decoded.id || decoded.userId, true); // +refreshTokenHash
     if (!user || !user.refreshTokenHash)
-      throw Object.assign(new Error('Session not found. Please log in again.'), { statusCode: 401 });
+      throw new AppError('Session not found. Please log in again.', 401);
 
     if (!user.isActive)
-      throw Object.assign(new Error('Account deactivated.'), { statusCode: 403 });
+      throw new AppError('Account deactivated.', 403);
 
     // Timing-safe comparison via bcrypt
     const isValid = await bcrypt.compare(refreshToken, user.refreshTokenHash);
@@ -270,7 +286,7 @@ class AuthService {
         $inc: { tokenVersion: 1 },
         refreshTokenHash: null,
       });
-      throw Object.assign(new Error('Session invalidated for security. Please log in again.'), { statusCode: 401 });
+      throw new AppError('Session invalidated for security. Please log in again.', 401);
     }
 
     // Rotate both tokens
@@ -300,7 +316,7 @@ class AuthService {
 
   // ── Forgot password ──────────────────────────────────────────────────────────
   async sendForgotPasswordOtp({ email }) {
-    if (!email) throw Object.assign(new Error('Email is required.'), { statusCode: 400 });
+    if (!email) throw new AppError('Email is required.', 400);
 
     // Always return 200 to not reveal account existence
     const user = await userRepository.findByEmail(email);
@@ -332,27 +348,27 @@ class AuthService {
 
   // ── Verify forgot-password OTP ───────────────────────────────────────────────
   async verifyForgotPasswordOtp({ email, otp }) {
-    if (!email || !otp) throw Object.assign(new Error('Email and OTP are required.'), { statusCode: 400 });
+    if (!email || !otp) throw new AppError('Email and OTP are required.', 400);
 
     const otpDoc = await otpRepository.findLatestByEmailAndPurpose(email, 'forgot_password');
-    if (!otpDoc) throw Object.assign(new Error('OTP not found. Request a new one.'), { statusCode: 404 });
+    if (!otpDoc) throw new AppError('OTP not found. Request a new one.', 404);
 
     if (otpDoc.expiresAt.getTime() < Date.now()) {
       await otpDoc.deleteOne();
-      throw Object.assign(new Error('OTP expired. Request a new one.'), { statusCode: 410 });
+      throw new AppError('OTP expired. Request a new one.', 410);
     }
 
     const config = await getConfig();
     if (otpDoc.attempts >= (config.maxOtpAttempts || 3)) {
       await otpDoc.deleteOne();
-      throw Object.assign(new Error('Too many attempts. Please request a new OTP.'), { statusCode: 429 });
+      throw new AppError('Too many attempts. Please request a new OTP.', 429);
     }
 
     const isMatch = await bcrypt.compare(otp, otpDoc.otpHash);
     if (!isMatch) {
       otpDoc.attempts += 1;
       await otpDoc.save();
-      throw Object.assign(new Error('Invalid OTP.'), { statusCode: 401 });
+      throw new AppError('Invalid OTP.', 401);
     }
 
     await otpDoc.deleteOne();
@@ -368,19 +384,19 @@ class AuthService {
   // ── Reset password ───────────────────────────────────────────────────────────
   async resetPassword({ email, resetToken, newPassword }) {
     if (!email || !resetToken || !newPassword)
-      throw Object.assign(new Error('Email, reset token, and new password are required.'), { statusCode: 400 });
+      throw new AppError('Email, reset token, and new password are required.', 400);
 
     let decoded;
     try {
       decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
     } catch {
-      throw Object.assign(new Error('Invalid or expired reset token.'), { statusCode: 401 });
+      throw new AppError('Invalid or expired reset token.', 401);
     }
     if (decoded.email !== email || decoded.purpose !== 'forgot_password_reset')
-      throw Object.assign(new Error('Invalid reset session.'), { statusCode: 401 });
+      throw new AppError('Invalid reset session.', 401);
 
     const user = await userRepository.findByEmail(email);
-    if (!user) throw Object.assign(new Error('User not found.'), { statusCode: 404 });
+    if (!user) throw new AppError('User not found.', 404);
 
     user.password    = hashPassword(newPassword);
     user.isVerified  = true;
@@ -394,10 +410,10 @@ class AuthService {
   // ── Change password (authenticated) ─────────────────────────────────────────
   async changePassword({ userId, currentPassword, newPassword, req }) {
     const user = await userRepository.findById(userId, true); // +password
-    if (!user) throw Object.assign(new Error('User not found.'), { statusCode: 404 });
+    if (!user) throw new AppError('User not found.', 404);
 
     if (!comparePassword(currentPassword, user.password))
-      throw Object.assign(new Error('Current password is incorrect.'), { statusCode: 401 });
+      throw new AppError('Current password is incorrect.', 401);
 
     user.password         = hashPassword(newPassword);
     user.refreshTokenHash = null; // invalidate all sessions

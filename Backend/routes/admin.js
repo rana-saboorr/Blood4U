@@ -15,7 +15,7 @@ const requireRole            = require('../middleware/requireRole');
 
 const {
   listUsers, deactivateUser, reactivateUser, changeUserRole, forceLogoutUser,
-  listBanks, approveBank, rejectBank, suspendBank,
+  listBanks, approveBank, rejectBank, suspendBank, deleteBank,
   listRequests, forceFulfillRequest,
   listDonors, suspendDonor,
   getAuditLog,
@@ -51,6 +51,7 @@ router.patch('/banks/:id/suspend',
   handleValidationErrors,
   suspendBank
 );
+router.delete('/banks/:id', v.mongoId('id'), handleValidationErrors, deleteBank);
 
 // ── Blood Requests ────────────────────────────────────────────────────────────
 router.get('/requests', v.pagination(), handleValidationErrors, listRequests);

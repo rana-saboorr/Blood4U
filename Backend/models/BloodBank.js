@@ -35,7 +35,6 @@ const bloodBankSchema = new mongoose.Schema(
       type: String,
       enum: ['pending', 'approved', 'rejected', 'suspended'],
       default: 'pending',
-      index: true,
     },
     /** Primary owner — required for requireOwnership checks */
     owner: {

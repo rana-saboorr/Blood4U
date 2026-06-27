@@ -2,9 +2,20 @@ import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateBloodBankStatus } from '../../features/data/dataSlice';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Phone, Building2, CheckCircle, XCircle, MessageSquare } from 'lucide-react';
+import { Search, MapPin, Phone, Building2, CheckCircle, XCircle, MessageSquare, Droplets, Clock } from 'lucide-react';
 import Button from '../../components/Button';
 import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
+
+const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } };
+const item = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 280, damping: 22 } } };
+
+const STATUS_CONFIG = {
+  pending:   { label: 'Pending',   cls: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
+  approved:  { label: 'Approved',  cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' },
+  rejected:  { label: 'Rejected',  cls: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
+  suspended: { label: 'Suspended', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
+};
 
 export default function BloodBanks() {
   const { role } = useSelector(state => state.auth);
@@ -13,14 +24,13 @@ export default function BloodBanks() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Admins see all, Users/Donors see only approved
-  const visibleBanks = role === 'admin' 
-    ? bloodBanks 
+  const visibleBanks = role === 'admin'
+    ? bloodBanks
     : bloodBanks.filter(b => b.status === 'approved');
 
-  const filteredBanks = visibleBanks.filter(bank => 
-    bank.city.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    bank.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredBanks = visibleBanks.filter(bank =>
+    bank.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    bank.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleStatus = (id, status) => {
@@ -29,87 +39,154 @@ export default function BloodBanks() {
   };
 
   const handleMessage = (bank) => {
-    // Treat the bank as a messageable entity identical to a donor
     navigate('/dashboard/chat', { state: { selectedDonor: { ...bank, isBank: true } } });
   };
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+      >
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Blood Banks Directory</h1>
-          <p className="text-gray-500 dark:text-gray-400">
-            {role === 'admin' ? 'Manage unverified bank registrations.' : 'Discover and contact accredited local blood banks.'}
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Building2 className="text-red-600" size={26} />
+            Blood Banks Directory
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            {role === 'admin'
+              ? 'Manage and review blood bank registrations.'
+              : 'Discover and contact accredited local blood banks.'}
           </p>
         </div>
-      </div>
+        <div className="text-sm text-gray-400 dark:text-gray-500 glass-panel rounded-xl px-4 py-2">
+          {filteredBanks.length} bank{filteredBanks.length !== 1 ? 's' : ''} found
+        </div>
+      </motion.div>
 
-      <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-zinc-800 flex items-center gap-3">
-        <Search className="text-gray-400" size={20} />
-        <input 
-          type="text" 
-          placeholder="Search blood banks by name or city..." 
-          className="flex-1 bg-transparent border-none outline-none text-gray-900 dark:text-white"
+      {/* Search bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="glass-panel rounded-2xl p-4 flex items-center gap-3"
+      >
+        <Search className="text-red-500 shrink-0" size={20} />
+        <input
+          type="text"
+          placeholder="Search blood banks by name or city..."
+          className="flex-1 bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-      </div>
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="text-gray-400 hover:text-red-500 transition-colors"
+          >
+            ✕
+          </button>
+        )}
+      </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-        {filteredBanks.length === 0 ? (
-          <div className="col-span-full p-8 text-center bg-transparent border border-dashed border-gray-300 dark:border-zinc-700 rounded-xl">
-            <p className="text-gray-500 dark:text-gray-400">No matching blood banks found.</p>
-          </div>
-        ) : (
-          filteredBanks.map(bank => (
-            <div key={bank.id} className="bg-white dark:bg-zinc-900 rounded-2xl flex flex-col p-6 shadow-sm hover:shadow-lg transition-shadow border border-gray-200 dark:border-zinc-800 relative overflow-hidden group">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl flex items-center justify-center">
-                  <Building2 size={24} />
-                </div>
+      {/* Grid */}
+      {filteredBanks.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="col-span-full p-12 text-center glass-panel rounded-2xl border border-dashed border-gray-300 dark:border-zinc-700"
+        >
+          <Building2 size={48} className="mx-auto text-gray-300 dark:text-zinc-700 mb-4" />
+          <p className="text-gray-500 dark:text-gray-400 font-medium">No matching blood banks found.</p>
+          <p className="text-sm text-gray-400 dark:text-gray-600 mt-1">Try a different search term.</p>
+        </motion.div>
+      ) : (
+        <motion.div
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        >
+          {filteredBanks.map(bank => {
+            const statusCfg = STATUS_CONFIG[bank.status] || STATUS_CONFIG.pending;
+            return (
+              <motion.div
+                key={bank.id || bank._id}
+                variants={item}
+                whileHover={{ y: -4, transition: { type: 'spring', stiffness: 400, damping: 25 } }}
+                className="clay-card flex flex-col p-6 relative overflow-hidden group spotlight-group"
+              >
+                {/* Status badge */}
                 {role === 'admin' && (
-                  <span className={`px-2 py-1 text-[10px] font-bold uppercase rounded-full tracking-wider ${bank.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-500' : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'}`}>
-                    {bank.status}
+                  <span className={`absolute top-4 right-4 px-2.5 py-0.5 text-[10px] font-bold uppercase rounded-full tracking-wider ${statusCfg.cls}`}>
+                    {statusCfg.label}
                   </span>
                 )}
-              </div>
-              
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 line-clamp-1">{bank.name}</h3>
-              
-              <div className="space-y-2 mb-6 text-gray-600 dark:text-gray-400">
-                <p className="flex items-start gap-2">
-                  <MapPin size={18} className="shrink-0 mt-0.5" />
-                  <span className="text-sm line-clamp-2">{bank.location}, {bank.city}</span>
-                </p>
-                <p className="flex items-center gap-2">
-                  <Phone size={18} className="shrink-0" />
-                  <span className="text-sm">{bank.contact}</span>
-                </p>
-              </div>
 
-              <div className="mt-auto border-t border-gray-100 dark:border-zinc-800 pt-4">
-                {role === 'admin' && bank.status === 'pending' ? (
-                  <div className="flex gap-3">
-                    <Button onClick={() => handleStatus(bank.id, 'approved')} className="w-full bg-green-600 hover:bg-green-700 py-2">
-                      <CheckCircle size={18} className="mr-2" /> Approve
-                    </Button>
-                    <Button onClick={() => handleStatus(bank.id, 'rejected')} variant="secondary" className="px-4 text-red-600 border-red-200 hover:bg-red-50 py-2">
-                      <XCircle size={18} />
-                    </Button>
-                  </div>
-                ) : (
-                  <Button onClick={() => handleMessage(bank)} className="w-full flex items-center gap-2" variant="outline">
-                    <MessageSquare size={18} /> Contact Admin/Bank
-                  </Button>
-                )}
-              </div>
+                {/* Icon */}
+                <div className="w-13 h-13 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-2xl flex items-center justify-center mb-4 w-12 h-12">
+                  <Building2 size={24} />
+                </div>
 
-              {/* Decorative side accent */}
-              <div className="absolute top-0 right-0 bottom-0 w-1 bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            </div>
-          ))
-        )}
-      </div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3 line-clamp-1">{bank.name}</h3>
+
+                <div className="space-y-2 mb-5 text-gray-500 dark:text-gray-400 flex-1">
+                  <p className="flex items-start gap-2 text-sm">
+                    <MapPin size={15} className="shrink-0 mt-0.5 text-red-500" />
+                    <span className="line-clamp-2">{bank.location}, {bank.city}</span>
+                  </p>
+                  {bank.contact && (
+                    <p className="flex items-center gap-2 text-sm">
+                      <Phone size={15} className="shrink-0 text-red-500" />
+                      <span>{bank.contact}</span>
+                    </p>
+                  )}
+                  {bank.inventory && (
+                    <p className="flex items-center gap-2 text-sm">
+                      <Droplets size={15} className="shrink-0 text-red-500" />
+                      <span>{Object.values(bank.inventory || {}).reduce((a, b) => a + (b || 0), 0)} total units</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="border-t border-gray-100 dark:border-zinc-800 pt-4">
+                  {role === 'admin' && bank.status === 'pending' ? (
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleStatus(bank.id || bank._id, 'approved')}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 py-2 text-sm"
+                      >
+                        <CheckCircle size={15} className="mr-1.5" /> Approve
+                      </Button>
+                      <Button
+                        onClick={() => handleStatus(bank.id || bank._id, 'rejected')}
+                        variant="secondary"
+                        className="px-3 text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 py-2"
+                      >
+                        <XCircle size={15} />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => handleMessage(bank)}
+                      className="w-full flex items-center justify-center gap-2"
+                      variant="outline"
+                    >
+                      <MessageSquare size={16} /> Contact Bank
+                    </Button>
+                  )}
+                </div>
+
+                {/* Hover accent */}
+                <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-red-600 to-amber-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              </motion.div>
+            );
+          })}
+        </motion.div>
+      )}
     </div>
   );
 }

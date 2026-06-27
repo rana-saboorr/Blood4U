@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" fill="none">
+  <rect width="192" height="192" rx="40" fill="#0f0c29"/>
+  <circle cx="96" cy="88" r="36" fill="#dc2626"/>
+  <path d="M96 52 C96 52 72 72 72 96 C72 112 82 124 96 124 C110 124 120 112 120 96 C120 72 96 52 96 52Z" fill="#ef4444"/>
+  <ellipse cx="84" cy="80" rx="6" ry="8" fill="rgba(255,255,255,0.35)"/>
+  <text x="96" y="168" text-anchor="middle" fill="#d4af37" font-family="system-ui,sans-serif" font-size="18" font-weight="700">Blood4U</text>
+</svg>

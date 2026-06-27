@@ -3,13 +3,14 @@ const User = require('../models/User');
 const Donation = require('../models/Donation');
 const { getCompatibleGroups } = require('../utils/bloodCompatibility');
 const donorRepository = require('../repositories/donorRepository');
+const AppError = require('../utils/appError');
 
 const DONATION_COOLDOWN_DAYS = 90;
 
 class DonorService {
   async registerDonor(userId, data) {
     const existing = await donorRepository.findByUserId(userId);
-    if (existing) throw new Error('You are already registered as a donor.');
+    if (existing) throw new AppError('You are already registered as a donor.', 409);
 
     // Capture location as GeoJSON
     const donorData = { ...data, userId };
@@ -33,7 +34,7 @@ class DonorService {
   }
 
   async searchDonors({ bloodGroup, city, limit = 10 }) {
-    if (!bloodGroup) throw new Error('bloodGroup is required for smart matching.');
+    if (!bloodGroup) throw new AppError('bloodGroup is required for smart matching.', 400);
 
     await donorRepository.reactivateExpiredCooldowns();
     const compatibleGroups = getCompatibleGroups(bloodGroup);
@@ -54,13 +55,13 @@ class DonorService {
   async getMyDonorProfile(userId) {
     await donorRepository.reactivateExpiredCooldowns();
     const donor = await Donor.findOne({ userId }).populate('userId', 'username email');
-    if (!donor) throw new Error('Donor profile not found.');
+    if (!donor) throw new AppError('Donor profile not found.', 404);
     return donor;
   }
 
   async updateMyDonorProfile(userId, body) {
     const currentDonor = await donorRepository.findByUserId(userId);
-    if (!currentDonor) throw new Error('Donor profile not found.');
+    if (!currentDonor) throw new AppError('Donor profile not found.', 404);
 
     const allowedFields = ['fullName', 'mobile', 'city', 'available', 'paymentType', 'socialLinks', 'image'];
     const isResting = currentDonor.isResting;
@@ -68,9 +69,7 @@ class DonorService {
       body.available !== undefined ? (body.available === true || body.available === 'true') : undefined;
 
     if (isResting && requestedAvailability === true) {
-      const err = new Error('You cannot change availability during the donation cooldown period.');
-      err.status = 403;
-      throw err;
+      throw new AppError('You cannot change availability during the donation cooldown period.', 403);
     }
 
     const update = {};
@@ -82,13 +81,13 @@ class DonorService {
     }
 
     const donor = await donorRepository.findOneAndUpdate(userId, update);
-    if (!donor) throw new Error('Donor profile not found.');
+    if (!donor) throw new AppError('Donor profile not found.', 404);
     return donor;
   }
 
   async logDonation(donorId) {
     const donor = await donorRepository.findById(donorId);
-    if (!donor) throw new Error('Donor not found.');
+    if (!donor) throw new AppError('Donor not found.', 404);
 
     donor.donationCount += 1;
     donor.lastDonationDate = new Date();
@@ -98,10 +97,10 @@ class DonorService {
   }
 
   async logManualDonation(userId, { location, quantity }) {
-    if (!location || !quantity) throw new Error('Location and quantity are required.');
+    if (!location || !quantity) throw new AppError('Location and quantity are required.', 400);
 
     const donor = await donorRepository.findByUserId(userId);
-    if (!donor) throw new Error('Donor profile not found.');
+    if (!donor) throw new AppError('Donor profile not found.', 404);
 
     const daysSince = donor.lastDonationDate
       ? (Date.now() - new Date(donor.lastDonationDate).getTime()) / (1000 * 60 * 60 * 24)
@@ -109,9 +108,7 @@ class DonorService {
 
     if (daysSince < DONATION_COOLDOWN_DAYS) {
       const daysLeft = Math.ceil(DONATION_COOLDOWN_DAYS - daysSince);
-      const err = new Error(`You are still in the cooldown period. ${daysLeft} day(s) remaining.`);
-      err.status = 403;
-      throw err;
+      throw new AppError(`You are still in the cooldown period. ${daysLeft} day(s) remaining.`, 403);
     }
 
     donor.donationCount += 1;

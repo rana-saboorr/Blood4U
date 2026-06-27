@@ -48,7 +48,6 @@ export default function Overview() {
     myDonorProfile, 
     requests, 
     bloodBanks,
-    events
   } = useSelector(state => state.data);
 
   const stats = [
@@ -133,24 +132,23 @@ export default function Overview() {
   // Bank Owner logic
   const myBank = bloodBanks.find(b => b.ownerUserId === user?._id);
   const bankCity = myBank?.city || user?.city;
-  // Blood banks should see requests in their city AND all emergency requests
-  const cityRequests = requests.filter(r => 
+  const cityRequests = requests.filter(r =>
     (bankCity && r.city?.toLowerCase() === bankCity.toLowerCase()) || r.urgent
   ).filter(r => r.status === 'approved');
-  const myEvents = events.filter(e => (e.createdBy?.id === user?._id || e.createdBy === user?._id));
 
   const rm = roleMessages[role] || roleMessages.user;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Welcome back, <span className="text-red-600">{user?.identifier || 'User'}</span> 👋
+      <header>
+        <p className="text-xs font-bold uppercase tracking-widest text-[#d4af37] mb-2">Dashboard</p>
+        <h1 className="font-display text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+          Welcome back, <span className="text-red-600">{user?.identifier || 'User'}</span>
         </h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
+        <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
-      </div>
+      </header>
 
       {/* Stats Grid */}
       <motion.div
@@ -163,7 +161,7 @@ export default function Overview() {
           const card = (
             <motion.div
               variants={item}
-              className="p-5 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center sm:items-start gap-3 hover:shadow-md hover:border-gray-200 dark:hover:border-zinc-700 transition-all cursor-pointer group"
+              className="p-5 glass-panel rounded-2xl flex flex-col sm:flex-row items-center sm:items-start gap-3 hover:shadow-lg transition-all cursor-pointer-interactive group spotlight-group"
             >
               <div className={`p-3 rounded-xl shrink-0 ${stat.bg} ${stat.color} group-hover:scale-110 transition-transform`}>
                 <stat.icon size={22} />
@@ -332,7 +330,7 @@ export default function Overview() {
             </div>
 
             <div className="divide-y divide-gray-50 dark:divide-zinc-800">
-              {news.map((item, i) => (
+              {news.map((item) => (
                 <div key={item.id} className="px-6 py-5 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors">
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-bold text-gray-900 dark:text-white text-base leading-tight">{item.title}</h3>

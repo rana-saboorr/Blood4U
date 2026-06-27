@@ -19,7 +19,8 @@ const {
   getBankById,
   updateBank,
   getBankInventory,
-  updateBankInventory
+  updateBankInventory,
+  setBloodStock,
 } = require('../controllers/bloodBankController');
 
 // ── Register a new bank ───────────────────────────────────────────────────────
@@ -68,6 +69,18 @@ router.get('/:id/inventory',
   [v.mongoId('id')],
   handleValidationErrors,
   getBankInventory
+);
+
+// ── Set absolute blood stock (owner/admin) — frontend compat ─────────────────
+router.patch('/:id/stock',
+  protect,
+  requireOwnership(BloodBank, 'owner'),
+  [
+    v.mongoId('id'),
+    body('bloodStock').isObject().withMessage('bloodStock object is required'),
+  ],
+  handleValidationErrors,
+  setBloodStock
 );
 
 // ── Update bank inventory (owner/admin) ───────────────────────────────────────
