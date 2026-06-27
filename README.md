@@ -312,7 +312,7 @@ Authentication/
 
 ---
 
-<p align="center">Developed with ❤️ for the community — <strong>Abdul Saboor</strong></p>
+<p align="center">Developed with ❤️ by <strong>Abdul Saboor</strong></p>
 <p align="center">
   <a href="https://linkedin.com/in/saboor-rana49">
     <img src="https://img.shields.io/badge/LinkedIn-1a1a2e?style=for-the-badge&logo=linkedin&logoColor=D4AF37" />
