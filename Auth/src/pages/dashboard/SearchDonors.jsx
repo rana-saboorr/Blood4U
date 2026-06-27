@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -105,8 +105,8 @@ export default function SearchDonors() {
 
       {/* Search Bar */}
       <div className="flex flex-col md:flex-row gap-3">
-        <div className="flex-1 bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-zinc-800 flex items-center gap-3">
-          <Search className="text-gray-400 shrink-0" size={20} />
+        <div className="flex-1 glass-panel p-4 rounded-2xl flex items-center gap-3">
+          <Search className="text-red-500 shrink-0" size={20} />
           <input
             type="text"
             placeholder="Search by city..."
@@ -137,7 +137,7 @@ export default function SearchDonors() {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-white dark:bg-zinc-900 p-5 rounded-xl border border-gray-200 dark:border-zinc-800 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="glass-panel p-5 rounded-2xl grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Blood Group</label>
                 <select value={bgFilter} onChange={e => setBgFilter(e.target.value)}
@@ -198,7 +198,7 @@ export default function SearchDonors() {
       {/* Donor Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         <AnimatePresence>
-          {filteredDonors.map((donor, i) => {
+          {filteredDonors.map((donor) => {
             const badge = BADGE_CONFIG[donor.badge] || BADGE_CONFIG.Bronze;
             const resting = isResting(donor.lastDonation);
             return (
@@ -209,7 +209,7 @@ export default function SearchDonors() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.2 }}
-                className="bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-gray-200 dark:border-zinc-800 flex flex-col hover:shadow-lg hover:border-red-200 dark:hover:border-red-900/50 transition-all"
+                className="clay-card p-5 flex flex-col hover:shadow-xl transition-all group"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="relative">
@@ -252,7 +252,7 @@ export default function SearchDonors() {
         </AnimatePresence>
 
         {filteredDonors.length === 0 && (
-          <div className="col-span-full py-16 text-center bg-transparent border border-dashed border-gray-300 dark:border-zinc-700 rounded-2xl">
+          <div className="col-span-full py-16 text-center glass-panel rounded-2xl border border-dashed border-gray-300 dark:border-zinc-700">
             <Heart className="mx-auto text-gray-300 dark:text-zinc-700 mb-4" size={48} />
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">No matches</h3>
             <p className="text-gray-500 mt-1">Try broader search criteria.</p>

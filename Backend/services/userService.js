@@ -4,6 +4,7 @@ const BloodBank = require('../models/BloodBank');
 const BloodRequest = require('../models/BloodRequest');
 const Donor = require('../models/Donor');
 const { logAudit } = require('../utils/audit');
+const AppError = require('../utils/appError');
 
 class UserService {
   async getAllUsers(query) {
@@ -16,13 +17,13 @@ class UserService {
 
   async getUserById(id) {
     const user = await userRepository.findById(id);
-    if (!user) throw Object.assign(new Error('User not found.'), { statusCode: 404 });
+    if (!user) throw new AppError('User not found.', 404);
     return user;
   }
 
   async updateUser(id, body) {
     const user = await userRepository.findById(id);
-    if (!user) throw Object.assign(new Error('User not found.'), { statusCode: 404 });
+    if (!user) throw new AppError('User not found.', 404);
 
     const { username, city, phone } = body;
     if (username) user.username = username;
@@ -35,7 +36,7 @@ class UserService {
 
   async deleteUser(id, adminId) {
     const user = await userRepository.findById(id);
-    if (!user) throw Object.assign(new Error('User not found.'), { statusCode: 404 });
+    if (!user) throw new AppError('User not found.', 404);
 
     // Clean up related data
     await Promise.all([

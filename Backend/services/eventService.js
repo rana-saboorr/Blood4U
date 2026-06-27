@@ -1,5 +1,6 @@
 const eventRepository = require('../repositories/eventRepository');
 const { sendSimpleEmail } = require('../utils/mailer');
+const AppError = require('../utils/appError');
 
 class EventService {
   async createEvent(user, body) {
@@ -7,9 +8,7 @@ class EventService {
     const isBankOwner = user.role === 'bankOwner';
 
     if (!isAdmin && !isBankOwner) {
-      const err = new Error('Only admins and blood bank owners can create events.');
-      err.status = 403;
-      throw err;
+      throw new AppError('Only admins and blood bank owners can create events.', 403);
     }
 
     const status = isAdmin ? 'approved' : 'pending';
@@ -45,9 +44,7 @@ class EventService {
   async getEventById(id, user) {
     const event = await eventRepository.findById(id);
     if (!event) {
-      const err = new Error('Event not found.');
-      err.status = 404;
-      throw err;
+      throw new AppError('Event not found.', 404);
     }
 
     const isAdmin = user?.role === 'admin';
@@ -57,9 +54,7 @@ class EventService {
       const isOwner = event.createdBy && event.createdBy._id.toString() === user?._id.toString();
       
       if (!isApproved && !isOwner) {
-         const err = new Error('Event not found.');
-         err.status = 404;
-         throw err;
+         throw new AppError('Event not found.', 404);
       }
     }
 
@@ -69,18 +64,14 @@ class EventService {
   async updateEvent(id, user, body) {
     const event = await eventRepository.findById(id);
     if (!event) {
-      const err = new Error('Event not found.');
-      err.status = 404;
-      throw err;
+      throw new AppError('Event not found.', 404);
     }
 
     const isAdmin = user.role === 'admin';
     const isOwner = event.createdBy && event.createdBy._id.toString() === user._id.toString();
 
     if (!isAdmin && !isOwner) {
-      const err = new Error('Not authorized to update this event.');
-      err.status = 403;
-      throw err;
+      throw new AppError('Not authorized to update this event.', 403);
     }
 
     const previousStatus = event.status;
@@ -120,18 +111,14 @@ class EventService {
   async deleteEvent(id, user) {
     const event = await eventRepository.findById(id);
     if (!event) {
-      const err = new Error('Event not found.');
-      err.status = 404;
-      throw err;
+      throw new AppError('Event not found.', 404);
     }
 
     const isAdmin = user.role === 'admin';
     const isOwner = event.createdBy && event.createdBy._id.toString() === user._id.toString();
 
     if (!isAdmin && !isOwner) {
-      const err = new Error('Not authorized to delete this event.');
-      err.status = 403;
-      throw err;
+      throw new AppError('Not authorized to delete this event.', 403);
     }
 
     return event.deleteOne();
@@ -140,13 +127,11 @@ class EventService {
   async toggleRsvp(id, user) {
     const event = await eventRepository.findById(id);
     if (!event) {
-      const err = new Error('Event not found.');
-      err.status = 404;
-      throw err;
+      throw new AppError('Event not found.', 404);
     }
 
     if (event.status !== 'approved') {
-      throw new Error('This event is not open for registration.');
+      throw new AppError('This event is not open for registration.', 400);
     }
 
     const userId = user._id;
@@ -156,7 +141,7 @@ class EventService {
       event.rsvpList = event.rsvpList.filter((id) => id.toString() !== userId.toString());
     } else {
       if (event.rsvpList.length >= event.capacity) {
-        throw new Error('Event is at full capacity.');
+        throw new AppError('Event is at full capacity.', 400);
       }
       event.rsvpList.push(userId);
     }

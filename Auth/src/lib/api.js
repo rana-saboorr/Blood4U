@@ -1,4 +1,15 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:3000/api/v1';
+
+function getCsrfUrl() {
+  const base = API_BASE_URL.replace(/\/$/, '');
+  if (base.endsWith('/v1') || base.includes('/api/v1')) {
+    return `${base}/auth/csrf-token`;
+  }
+  return `${base}/csrf-token`;
+}
 
 // ── CSRF Token Cache ──────────────────────────────────────────────────────────
 let csrfToken = null;
@@ -10,7 +21,7 @@ async function getCsrfToken() {
 
   csrfPromise = (async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/csrf-token`, { credentials: 'include' });
+      const res = await fetch(getCsrfUrl(), { credentials: 'include' });
       if (!res.ok) throw new Error();
       const data = await res.json();
       csrfToken = data.csrfToken;

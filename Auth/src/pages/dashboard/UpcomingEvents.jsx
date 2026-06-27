@@ -2,15 +2,19 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchPublicEvents, toggleRsvpApi } from '../../features/data/dataSlice';
-import { Calendar, Clock, MapPin, Users, Info, CheckCircle2, Phone } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, CheckCircle2, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import PublicEventsLayout from '../../components/layout/PublicEventsLayout';
+import EmptyState from '../../components/ui/EmptyState';
 
 export default function UpcomingEvents() {
   const { events } = useSelector(state => state.data);
   const { user } = useSelector(state => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isDashboard = location.pathname.startsWith('/dashboard');
   const [cityFilter, setCityFilter] = useState('');
   const userId = user?._id?.toString() || null;
 
@@ -50,21 +54,26 @@ export default function UpcomingEvents() {
     }
   };
 
-  return (
+  const content = (
     <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Upcoming Events</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Discover blood camps near you. RSVP to reserve your spot.</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-[#d4af37] mb-2">Blood drives</p>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">Upcoming Events</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-2">Discover blood camps near you. RSVP to reserve your spot.</p>
         </div>
-        <input
-          type="text"
-          placeholder="Filter by City..."
-          className="w-full md:w-64 px-4 py-3 rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-900 dark:text-white outline-none"
-          value={cityFilter}
-          onChange={e => setCityFilter(e.target.value)}
-        />
-      </div>
+        <div className="w-full md:w-72">
+          <label htmlFor="city-filter" className="sr-only">Filter by city</label>
+          <input
+            id="city-filter"
+            type="search"
+            placeholder="Filter by city..."
+            className="w-full px-4 py-3.5 rounded-2xl glass-panel border border-white/30 dark:border-zinc-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-red-500/20"
+            value={cityFilter}
+            onChange={e => setCityFilter(e.target.value)}
+          />
+        </div>
+      </header>
 
       <AnimatePresence>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -80,7 +89,7 @@ export default function UpcomingEvents() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ delay: i * 0.08 }}
-                className={`group bg-white dark:bg-zinc-900 rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all border ${hasRsvpd ? 'border-green-300 dark:border-green-700' : 'border-gray-100 dark:border-zinc-800'}`}
+                className={`group glass-panel rounded-3xl overflow-hidden hover:shadow-xl transition-all border ${hasRsvpd ? 'border-green-300/60 dark:border-green-700/60' : 'border-white/30 dark:border-zinc-800/50'}`}
               >
                 {/* Header art */}
                 <div className={`h-28 flex items-center justify-center relative overflow-hidden ${hasRsvpd ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 'bg-gradient-to-r from-red-600 to-indigo-600'}`}>
@@ -148,8 +157,9 @@ export default function UpcomingEvents() {
 
                   <div className="border-t border-gray-100 dark:border-zinc-800 pt-4">
                     <button
+                      type="button"
                       onClick={() => handleRsvp(evt)}
-                      className={`w-full py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                      className={`w-full py-3 rounded-xl font-semibold text-sm transition-all cursor-pointer-interactive ${
                         hasRsvpd
                           ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-400 hover:border-red-200'
                           : isFull
@@ -157,6 +167,7 @@ export default function UpcomingEvents() {
                           : 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20'
                       }`}
                       disabled={isFull && !hasRsvpd}
+                      aria-label={hasRsvpd ? `Cancel RSVP for ${evt.name}` : isFull ? `${evt.name} is full` : `RSVP for ${evt.name}`}
                     >
                       {hasRsvpd ? '✓ Attending — Click to Cancel' : isFull ? 'Event Full' : "I'm Attending →"}
                     </button>
@@ -167,13 +178,18 @@ export default function UpcomingEvents() {
           })}
 
           {displayEvents.length === 0 && (
-            <div className="col-span-full p-12 text-center bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-3xl">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">No Events Found</h3>
-              <p className="text-gray-500 mt-2">Adjust your city filter or check back later.</p>
+            <div className="col-span-full">
+              <EmptyState
+                icon={Calendar}
+                title="No events found"
+                description="Adjust your city filter or check back later for new blood drives in your area."
+              />
             </div>
           )}
         </div>
       </AnimatePresence>
     </div>
   );
+
+  return isDashboard ? content : <PublicEventsLayout>{content}</PublicEventsLayout>;
 }

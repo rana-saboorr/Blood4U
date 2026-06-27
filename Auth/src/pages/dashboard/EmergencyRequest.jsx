@@ -4,13 +4,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
+import { apiRequest } from '../../lib/api';
 import { addNotification, createBloodRequest, setEmergencyActive, fetchDashboardData } from '../../features/data/dataSlice';
 import { socket } from '../../lib/socket';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
-import { AlertTriangle, Send, X, Siren } from 'lucide-react';
+import { AlertTriangle, Send, X, Siren, CheckCircle2 } from 'lucide-react';
 
 const schema = yup.object().shape({
   bloodGroup: yup.string().required('Blood Group is required').oneOf(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']),
@@ -24,7 +25,7 @@ const schema = yup.object().shape({
 export default function EmergencyRequest() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { emergencyActive, requests } = useSelector(state => state.data);
+  const { requests } = useSelector(state => state.data);
   const { user, role } = useSelector(state => state.auth);
   const [submitted, setSubmitted] = useState(false);
 
@@ -37,7 +38,7 @@ export default function EmergencyRequest() {
   if (hasActiveRequest && !submitted) {
     return (
       <div className="max-w-2xl mx-auto py-12">
-        <div className="bg-white dark:bg-zinc-900 rounded-3xl p-10 text-center border border-amber-200 dark:border-amber-900/50 shadow-xl shadow-amber-500/5">
+        <div className="glass-panel rounded-3xl p-10 text-center border border-amber-200 dark:border-amber-900/50 shadow-xl shadow-amber-500/5">
           <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
             <AlertTriangle size={40} />
           </div>
@@ -45,13 +46,14 @@ export default function EmergencyRequest() {
           <p className="text-gray-500 dark:text-gray-400 mb-8">
             System policy allows only <strong>one active blood request</strong> at a time. Your previous request is still active. Please mark it as fulfilled or contact support to proceed.
           </p>
-          <Button onClick={() => navigate('/dashboard/requests')} className="w-auto px-8 bg-zinc-900 dark:bg-white dark:text-zinc-900">
+          <Button onClick={() => navigate('/dashboard/requests')} className="w-auto px-8">
             Manage My Requests
           </Button>
         </div>
       </div>
     );
   }
+
   const onSubmit = async (data) => {
     await dispatch(createBloodRequest({
       ...data,
@@ -74,12 +76,10 @@ export default function EmergencyRequest() {
 
     dispatch(addNotification(broadcastData));
     
-    // Broadcast to all connected users
     if (socket.connected) {
       socket.emit('emergency:sos:broadcast', broadcastData);
     }
 
-    // Save persistent notification to DB
     try {
       await apiRequest('/notifications', {
         method: 'POST',
@@ -88,7 +88,7 @@ export default function EmergencyRequest() {
           recipients: ['all']
         })
       });
-    } catch (e) {
+    } catch {
       console.error('Failed to save persistent notification');
     }
 
@@ -101,9 +101,9 @@ export default function EmergencyRequest() {
     return (
       <div className="max-w-2xl mx-auto">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
+          initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white dark:bg-zinc-900 rounded-3xl p-12 text-center border border-red-200 dark:border-red-900/50 shadow-2xl shadow-red-500/10"
+          className="glass-panel rounded-3xl p-12 text-center border border-red-200 dark:border-red-900/50 shadow-2xl"
         >
           <motion.div
             animate={{ scale: [1, 1.1, 1] }}
@@ -118,7 +118,7 @@ export default function EmergencyRequest() {
           </p>
           <div className="grid grid-cols-3 gap-4 mb-8 text-center">
             {['Donors Notified', 'Avg. Response Time', 'Est. Blood Banks'].map((label, i) => (
-              <div key={i} className="p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl">
+              <div key={i} className="clay-card p-4">
                 <p className="text-2xl font-bold text-red-600">{['12', '8 min', '3'][i]}</p>
                 <p className="text-xs text-gray-500 mt-1">{label}</p>
               </div>
@@ -137,13 +137,9 @@ export default function EmergencyRequest() {
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden bg-gradient-to-r from-red-600 to-red-700 rounded-3xl p-8 text-white"
+        className="relative overflow-hidden bg-gradient-to-r from-red-600 via-red-700 to-red-800 rounded-3xl p-8 text-white"
       >
-        <motion.div
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="absolute inset-0 bg-white/5 rounded-3xl"
-        />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.12),transparent_60%)] pointer-events-none" />
         <div className="relative z-10 flex items-center gap-4">
           <motion.div
             animate={{ scale: [1, 1.15, 1] }}
@@ -153,8 +149,8 @@ export default function EmergencyRequest() {
             <AlertTriangle size={36} />
           </motion.div>
           <div>
-            <h1 className="text-3xl font-bold">🚨 Emergency Blood Request</h1>
-            <p className="text-red-100 mt-1">
+            <h1 className="text-3xl font-bold">Emergency Blood Request</h1>
+            <p className="text-red-100 mt-1 text-sm">
               This will instantly broadcast to <strong>all nearby donors</strong> and appears as a priority alert system-wide.
             </p>
           </div>
@@ -163,13 +159,13 @@ export default function EmergencyRequest() {
 
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-        className="bg-white dark:bg-zinc-900 rounded-3xl p-8 border border-gray-200 dark:border-zinc-800 shadow-sm"
+        className="glass-panel rounded-3xl p-8"
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-gray-900 dark:text-white">Blood Group Needed <span className="text-red-500">*</span></label>
-              <select {...register('bloodGroup')} className={`w-full px-4 py-3 rounded-xl border outline-none transition-all bg-transparent text-gray-900 dark:text-white dark:bg-zinc-800/50 ${errors.bloodGroup ? 'border-red-500' : 'border-gray-200 dark:border-zinc-700'}`}>
+              <select {...register('bloodGroup')} className={`w-full px-4 py-3 rounded-xl border outline-none transition-all bg-transparent text-gray-900 dark:text-white dark:bg-zinc-800/50 ${errors.bloodGroup ? 'border-red-500' : 'border-gray-200 dark:border-zinc-700 focus:border-red-500'}`}>
                 <option className="dark:bg-zinc-800" value="">Select Group</option>
                 {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(bg => <option className="dark:bg-zinc-800" key={bg} value={bg}>{bg}</option>)}
               </select>
@@ -178,15 +174,15 @@ export default function EmergencyRequest() {
             <Input label="Units Needed *" type="number" placeholder="2" {...register('units')} error={errors.units?.message} />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <Input label="Hospital Name *" placeholder="Services Hospital" {...register('hospital')} error={errors.hospital?.message} />
             <Input label="City *" placeholder="Rawalpindi" {...register('city')} error={errors.city?.message} />
           </div>
 
-          <Input label="Contact Number *" placeholder="+923001234567" {...register('contact')} error={errors.contact?.message} />
+          <Input label="Contact Number *" placeholder="03001234567" {...register('contact')} error={errors.contact?.message} />
           <Input label="Full Address *" placeholder="Ward 5, Emergency Block" {...register('address')} error={errors.address?.message} />
 
-          <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-xl text-sm text-red-700 dark:text-red-400">
+          <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl text-sm text-red-700 dark:text-red-400">
             ⚠️ By submitting this form, you confirm this is a genuine medical emergency. Misuse may result in account suspension.
           </div>
 

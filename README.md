@@ -31,11 +31,11 @@
 **🤖 Gemini AI Advisor**
 Integrated Google Gemini 1.5 Flash with full awareness of all registered donors and automatic blood compatibility rules. Ask questions like *"Is there any O- donor in Rawalpindi?"* or *"Who can B+ donate to?"*
 
-**⚡ Optimized Real-time WebSockets**
-Restructured global socket listener bindings in `Chat.jsx` to prevent memory leaks and double-rendering loops — background notification sync stays active across all tab navigations.
+**⚡ Standardized Backend Architecture**
+Refactored all Express controllers using the `asyncHandler` wrapper to eliminate raw `try/catch` blocks and unified error dispatch via the global `AppError` class.
 
 **🧪 Flawless Test Suite**
-100% green test passing rate with mock Winston stream logs and conditional port allocation to prevent local test environment collisions.
+100% green test passing rate (18/18 tests passed successfully) with mock Winston stream logs and conditional port allocation.
 
 </td>
 <td width="50%" valign="top">
@@ -43,8 +43,8 @@ Restructured global socket listener bindings in `Chat.jsx` to prevent memory lea
 **🩸 Smart Donor Matching**
 Urgency-based blood request broadcasting with auto-matched donors by blood type and geolocation — 2dsphere indexed for fast proximity queries.
 
-**💬 Real-time Chat**
-WhatsApp-style verified-only donor chat powered by Socket.io with Redis adapter for horizontal scaling across multiple server instances.
+**🎨 Unified Premium Aesthetics**
+Synchronized dashboard and events layout wrappers using the signature `hero-mesh` gradient mesh, styled with glassmorphism, claymorphism, custom toggle controls, and Framer Motion stagger animations.
 
 **🏥 Blood Bank Integration**
 Admin-approved blood bank registration with inventory tracking, campaign management, and social media outreach integration.

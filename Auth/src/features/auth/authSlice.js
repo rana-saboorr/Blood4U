@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import { apiRequest } from '../../lib/api';
+import { apiRequest, clearCsrfToken } from '../../lib/api';
 
 const normalizeUser = (user) => ({
   ...user,
@@ -19,6 +19,7 @@ export const signinUser = createAsyncThunk('auth/signinUser', async ({ identifie
     method: 'POST',
     body: JSON.stringify({ identifier, password }),
   });
+  clearCsrfToken();
   return normalizeUser(payload.user);
 });
 
@@ -29,6 +30,7 @@ export const fetchMe = createAsyncThunk('auth/fetchMe', async () => {
 
 export const signoutUser = createAsyncThunk('auth/signoutUser', async () => {
   await apiRequest('/auth/logout', { method: 'POST' });
+  clearCsrfToken();
   return true;
 });
 

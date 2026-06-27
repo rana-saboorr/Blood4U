@@ -3,6 +3,7 @@ const Donor = require('../models/Donor');
 const requestRepository = require('../repositories/requestRepository');
 const donorRepository = require('../repositories/donorRepository');
 const { getCompatibleGroups } = require('../utils/bloodCompatibility');
+const AppError = require('../utils/appError');
 
 class RequestService {
   async createRequest(user, body, io) {
@@ -13,9 +14,7 @@ class RequestService {
         status: { $in: ['pending', 'approved'] },
       });
       if (activeRequest) {
-        const err = new Error('You already have an active blood request. Please complete or delete it first.');
-        err.status = 400;
-        throw err;
+        throw new AppError('You already have an active blood request. Please complete or delete it first.', 400);
       }
     }
 
@@ -83,14 +82,12 @@ class RequestService {
       .populate('userId', 'username email')
       .populate('matchedDonors', 'fullName bloodGroup city mobile available');
 
-    if (!request) throw new Error('Blood request not found.');
+    if (!request) throw new AppError('Blood request not found.', 404);
 
     const requestUserId = request.userId._id ? request.userId._id.toString() : request.userId.toString();
     const isOwner = user && requestUserId === user._id.toString();
     if (!isOwner && (!user || user.role !== 'admin')) {
-      const err = new Error('Not authorized.');
-      err.status = 403;
-      throw err;
+      throw new AppError('Not authorized.', 403);
     }
     return request;
   }
@@ -102,7 +99,7 @@ class RequestService {
     if (status) {
       const validStatuses = ['pending', 'approved', 'rejected', 'fulfilled'];
       if (!validStatuses.includes(status)) {
-        throw new Error('Invalid status value.');
+        throw new AppError('Invalid status value.', 400);
       }
       update.status = status;
       update.rejectedAt = status === 'rejected' ? new Date() : null;
@@ -111,7 +108,7 @@ class RequestService {
     if (urgent !== undefined) update.urgent = urgent;
 
     const request = await requestRepository.findByIdAndUpdate(id, { $set: update });
-    if (!request) throw new Error('Request not found.');
+    if (!request) throw new AppError('Request not found.', 404);
 
     io.emit('data:sync:command', { type: 'request', id });
     return request;
@@ -124,29 +121,23 @@ class RequestService {
       .populate('userId', 'username')
       .populate('matchedDonors', '_id');
 
-    if (!request) throw new Error('Request not found.');
+    if (!request) throw new AppError('Request not found.', 404);
     if (!['pending', 'approved'].includes(request.status)) {
-      throw new Error('Request is not open for donation.');
+      throw new AppError('Request is not open for donation.', 400);
     }
 
     const donor = await donorRepository.findByUserId(user._id);
     if (!donor) {
-      const err = new Error('Donor profile not found.');
-      err.status = 403;
-      throw err;
+      throw new AppError('Donor profile not found.', 403);
     }
 
     const isMatched = (request.matchedDonors || []).some((d) => d._id.toString() === donor._id.toString());
     if (!isMatched) {
-      const err = new Error('This request does not match your blood group.');
-      err.status = 403;
-      throw err;
+      throw new AppError('This request does not match your blood group.', 403);
     }
 
     if (donor.isResting) {
-      const err = new Error('You are in donation cooldown. Try again later.');
-      err.status = 403;
-      throw err;
+      throw new AppError('You are in donation cooldown. Try again later.', 403);
     }
 
     if (!confirmed) {
@@ -167,14 +158,12 @@ class RequestService {
 
   async deleteRequest(id, user, io) {
     const request = await requestRepository.findById(id);
-    if (!request) throw new Error('Request not found.');
+    if (!request) throw new AppError('Request not found.', 404);
 
     const requestUserId = request.userId._id ? request.userId._id.toString() : request.userId.toString();
     const isOwner = user && requestUserId === user._id.toString();
     if (!isOwner && (!user || user.role !== 'admin')) {
-      const err = new Error('Not authorized.');
-      err.status = 403;
-      throw err;
+      throw new AppError('Not authorized.', 403);
     }
 
     await request.deleteOne();

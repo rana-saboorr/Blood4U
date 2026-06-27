@@ -59,9 +59,25 @@ export default function BecomeDonor() {
     defaultValues: { paid: 'false', available: 'true', dob: '2008-01-01' }
   });
 
+  const [coords, setCoords] = useState({ lat: null, lng: null });
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCoords({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        () => {}
+      );
+    }
+  }, []);
+
   if (role === 'donor') {
     return (
-      <div className="flex flex-col items-center justify-center max-w-2xl mx-auto py-20 text-center">
+      <div className="flex flex-col items-center justify-center max-w-2xl mx-auto py-24 text-center">
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200 }}
           className="w-24 h-24 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-full flex items-center justify-center mb-6">
           <CheckCircle2 size={48} />
@@ -77,24 +93,6 @@ export default function BecomeDonor() {
       </div>
     );
   }
-
-  const [coords, setCoords] = useState({ lat: null, lng: null });
-
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCoords({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        () => {
-          // Silent fallback if location permission denied
-        }
-      );
-    }
-  }, []);
 
   const onSubmit = async (data) => {
     try {
@@ -113,30 +111,29 @@ export default function BecomeDonor() {
     }
   };
 
-
   return (
-    <div className="max-w-3xl mx-auto">
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden bg-gradient-to-br from-red-600 to-red-800 p-8 rounded-t-3xl text-white text-center"
-      >
-        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-3xl mx-auto glass-panel rounded-3xl overflow-hidden"
+    >
+      <div className="relative overflow-hidden bg-gradient-to-br from-red-600 via-red-700 to-red-800 p-8 text-white text-center">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.12),transparent_60%)] pointer-events-none" />
         <div className="relative z-10">
           <HeartPulse size={48} className="mx-auto mb-4 opacity-90" />
           <h1 className="text-3xl font-bold">Become a Donor</h1>
-          <p className="mt-2 text-red-100/80">Your single drop of blood can save up to 3 lives.</p>
+          <p className="mt-2 text-red-100/80 text-sm">Your single drop of blood can save up to 3 lives.</p>
         </div>
-      </motion.div>
+      </div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-        className="bg-white dark:bg-zinc-900 p-8 rounded-b-3xl shadow-xl border border-t-0 border-gray-200 dark:border-zinc-800"
-      >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="p-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Input label="Full Name" placeholder="John Doe" {...register('fullName')} error={errors.fullName?.message} />
-            <Input label="Contact Number" placeholder="+923001234567" {...register('contact')} error={errors.contact?.message} />
+            <Input label="Contact Number" placeholder="03001234567" {...register('contact')} error={errors.contact?.message} />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <SelectField label="Blood Group" error={errors.bloodGroup?.message} {...register('bloodGroup')}>
               <option value="">Select Group</option>
               {BLOOD_GROUPS.map(bg => <option key={bg} value={bg}>{bg}</option>)}
@@ -144,7 +141,7 @@ export default function BecomeDonor() {
             <Input label="City" placeholder="Lahore" {...register('city')} error={errors.city?.message} />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Input 
               label="Date of Birth (18+ required)" 
               type="date" 
@@ -155,7 +152,7 @@ export default function BecomeDonor() {
             <Input label="Weight in kg (50kg minimum)" type="number" placeholder="65" {...register('weight')} error={errors.weight?.message} />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <SelectField label="Gender" error={errors.gender?.message} {...register('gender')}>
               <option value="">Select Gender</option>
               {['Male', 'Female', 'Other'].map(g => <option key={g} value={g}>{g}</option>)}
@@ -171,15 +168,15 @@ export default function BecomeDonor() {
             <option value="false">🔴 No, I'm unavailable right now</option>
           </SelectField>
 
-          <div className="border-t border-gray-100 dark:border-zinc-800 pt-5">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Optional Social Links</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="border-t border-gray-200 dark:border-zinc-800 pt-5">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Optional Contact Options</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <Input label="Instagram / Social" placeholder="@username" />
-              <Input label="WhatsApp" placeholder="+923001234567" />
+              <Input label="WhatsApp Link / Number" placeholder="e.g. 03001234567" />
             </div>
           </div>
 
-          <Button type="submit" isLoading={isSubmitting} className="w-full text-base py-3.5 shadow-xl shadow-red-500/20">
+          <Button type="submit" isLoading={isSubmitting} className="w-full text-base py-3.5 bg-red-600 hover:bg-red-700 shadow-xl shadow-red-500/20">
             Register as Donor
           </Button>
 
@@ -187,7 +184,7 @@ export default function BecomeDonor() {
             By registering, you confirm that your information is legitimate and you agree to undergo medical screening prior to donation.
           </p>
         </form>
-      </motion.div>
-    </div>
+      </div>
+    </motion.div>
   );
 }
