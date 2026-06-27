@@ -7,6 +7,7 @@
 const rateLimit = require('express-rate-limit');
 const { AuthService, setAuthCookies, clearAuthCookies } = require('../services/authService');
 const { sanitizeUser } = require('../utils/sanitize');
+const asyncHandler = require('../middleware/asyncHandler');
 
 // Refresh endpoint rate limiter: 20 req/15min per IP
 const refreshLimiter = rateLimit({
@@ -16,50 +17,39 @@ const refreshLimiter = rateLimit({
 });
 
 // ── Send signup OTP ─────────────────────────────────────────────────────────
-const sendSignupOtp = async (req, res, next) => {
-  try {
-    const result = await AuthService.sendSignupOtp(req.body);
-    res.status(200).json({ success: true, ...result });
-  } catch (err) {
-    next(err);
-  }
-};
+const sendSignupOtp = asyncHandler(async (req, res) => {
+  const result = await AuthService.sendSignupOtp(req.body);
+  res.status(200).json({ success: true, ...result });
+});
 
 // ── Verify signup OTP ───────────────────────────────────────────────────────
-const verifySignupOtp = async (req, res, next) => {
-  try {
-    const user = await AuthService.verifySignupOtp(req.body);
-    res.status(201).json({
-      success: true,
-      message: 'Account created successfully. Please log in.',
-      user:    sanitizeUser(user, 'self', user._id),
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+const verifySignupOtp = asyncHandler(async (req, res) => {
+  const { user, accessToken, refreshToken } = await AuthService.verifySignupOtp({ ...req.body, req });
+  setAuthCookies(res, accessToken, refreshToken);
+  res.status(201).json({
+    success: true,
+    message: 'Signup verified and logged in successfully!',
+    user:    sanitizeUser(user, user.role, user._id),
+  });
+});
 
 // ── Login ───────────────────────────────────────────────────────────────────
-const login = async (req, res, next) => {
-  try {
-    const { user, accessToken, refreshToken, message } =
-      await AuthService.login({ ...req.body, req });
+const login = asyncHandler(async (req, res) => {
+  const { user, accessToken, refreshToken, message } =
+    await AuthService.login({ ...req.body, req });
 
-    setAuthCookies(res, accessToken, refreshToken);
-    res.status(200).json({
-      success: true,
-      message,
-      user: sanitizeUser(user, user.role, user._id),
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+  setAuthCookies(res, accessToken, refreshToken);
+  res.status(200).json({
+    success: true,
+    message,
+    user: sanitizeUser(user, user.role, user._id),
+  });
+});
 
 // ── Refresh access token ────────────────────────────────────────────────────
 const refresh = [
   refreshLimiter,
-  async (req, res, next) => {
+  asyncHandler(async (req, res) => {
     try {
       const refreshToken = req.cookies?.refreshToken;
       const { user, accessToken, refreshToken: newRefreshToken } =
@@ -70,87 +60,63 @@ const refresh = [
     } catch (err) {
       // Clear cookies on invalid refresh so client doesn't loop
       clearAuthCookies(res);
-      next(err);
+      throw err;
     }
-  },
+  }),
 ];
 
 // ── Logout ──────────────────────────────────────────────────────────────────
-const logout = async (req, res, next) => {
-  try {
-    await AuthService.logout({ userId: req.user._id, req });
-    clearAuthCookies(res);
-    res.status(200).json({ success: true, message: 'Logged out successfully.' });
-  } catch (err) {
-    next(err);
-  }
-};
+const logout = asyncHandler(async (req, res) => {
+  await AuthService.logout({ userId: req.user._id, req });
+  clearAuthCookies(res);
+  res.status(200).json({ success: true, message: 'Logged out successfully.' });
+});
 
 // ── Logout all devices ──────────────────────────────────────────────────────
-const logoutAll = async (req, res, next) => {
-  try {
-    await AuthService.logoutAll({ userId: req.user._id, req });
-    clearAuthCookies(res);
-    res.status(200).json({ success: true, message: 'Logged out from all devices.' });
-  } catch (err) {
-    next(err);
-  }
-};
+const logoutAll = asyncHandler(async (req, res) => {
+  await AuthService.logoutAll({ userId: req.user._id, req });
+  clearAuthCookies(res);
+  res.status(200).json({ success: true, message: 'Logged out from all devices.' });
+});
 
 // ── Get current user ────────────────────────────────────────────────────────
-const getMe = async (req, res) => {
+const getMe = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     user: sanitizeUser(req.user, req.user.role, req.user._id),
   });
-};
+});
 
 // ── Forgot password — send OTP ──────────────────────────────────────────────
-const sendForgotPasswordOtp = async (req, res, next) => {
-  try {
-    const result = await AuthService.sendForgotPasswordOtp({ email: req.body.email });
-    res.status(200).json({ success: true, ...result });
-  } catch (err) {
-    next(err);
-  }
-};
+const sendForgotPasswordOtp = asyncHandler(async (req, res) => {
+  const result = await AuthService.sendForgotPasswordOtp({ email: req.body.email });
+  res.status(200).json({ success: true, ...result });
+});
 
 // ── Forgot password — verify OTP ────────────────────────────────────────────
-const verifyForgotPasswordOtp = async (req, res, next) => {
-  try {
-    const result = await AuthService.verifyForgotPasswordOtp(req.body);
-    res.status(200).json({ success: true, ...result });
-  } catch (err) {
-    next(err);
-  }
-};
+const verifyForgotPasswordOtp = asyncHandler(async (req, res) => {
+  const result = await AuthService.verifyForgotPasswordOtp(req.body);
+  res.status(200).json({ success: true, ...result });
+});
 
 // ── Reset password ──────────────────────────────────────────────────────────
-const resetPassword = async (req, res, next) => {
-  try {
-    const result = await AuthService.resetPassword(req.body);
-    res.status(200).json({ success: true, ...result });
-  } catch (err) {
-    next(err);
-  }
-};
+const resetPassword = asyncHandler(async (req, res) => {
+  const result = await AuthService.resetPassword(req.body);
+  res.status(200).json({ success: true, ...result });
+});
 
 // ── Change password (authenticated) ────────────────────────────────────────
-const changePassword = async (req, res, next) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    const result = await AuthService.changePassword({
-      userId: req.user._id,
-      currentPassword,
-      newPassword,
-      req,
-    });
-    clearAuthCookies(res);
-    res.status(200).json({ success: true, ...result });
-  } catch (err) {
-    next(err);
-  }
-};
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const result = await AuthService.changePassword({
+    userId: req.user._id,
+    currentPassword,
+    newPassword,
+    req,
+  });
+  clearAuthCookies(res);
+  res.status(200).json({ success: true, ...result });
+});
 
 module.exports = {
   sendSignupOtp,

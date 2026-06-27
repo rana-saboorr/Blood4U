@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { BarChart2, Users, Droplet, Building2, Calendar, TrendingUp, MapPin } from 'lucide-react';
 import Counter from '../../components/Counter';
 
@@ -16,6 +17,7 @@ const levelLabel = (pct) => {
 };
 
 export default function Analytics() {
+  const navigate = useNavigate();
   const { donors, requests, events, bloodBanks, systemUsers } = useSelector(state => state.data);
 
   const totalUsers = systemUsers.length + donors.length;

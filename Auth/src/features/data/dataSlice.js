@@ -71,13 +71,13 @@ const mapEvent = (e) => ({
 
 const mapBank = (b) => ({
   id: b._id,
-  ownerUserId: b.registeredBy?._id,
+  ownerUserId: b.registeredBy?._id || b.owner?._id || b.owner,
   name: b.name,
   city: b.city,
   contact: b.contact,
   location: b.address,
   status: b.status,
-  bloodStock: b.bloodStock || {},
+  bloodStock: b.bloodStock || b.inventory || {},
   coords: b.location,
 });
 
@@ -246,7 +246,7 @@ export const updateBloodStockApi = createAsyncThunk('data/updateBloodStockApi', 
     method: 'PATCH',
     body: JSON.stringify({ bloodStock }),
   });
-  return mapBank(payload.bank || { ...payload, _id: id }); // Handle varied response formats
+  return mapBank(payload.bank || { _id: id, bloodStock });
 });
 
 export const createNewsApi = createAsyncThunk('data/createNewsApi', async (newsData) => {
@@ -274,7 +274,7 @@ export const deleteRequestApi = createAsyncThunk('data/deleteRequestApi', async 
 });
 
 export const deleteBankApi = createAsyncThunk('data/deleteBankApi', async (id) => {
-  await apiRequest(`/banks/${id}`, { method: 'DELETE' });
+  await apiRequest(`/admin/banks/${id}`, { method: 'DELETE' });
   return id;
 });
 
@@ -291,11 +291,22 @@ export const markAllNotificationsReadApi = createAsyncThunk('data/markAllNotific
 });
 
 export const updateBankStatusApi = createAsyncThunk('data/updateBankStatusApi', async ({ id, status }) => {
-  const payload = await apiRequest(`/banks/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status }),
-  });
-  return mapBank(payload.bank);
+  if (status === 'approved') {
+    await apiRequest(`/admin/banks/${id}/approve`, { method: 'PATCH' });
+  } else if (status === 'rejected') {
+    await apiRequest(`/admin/banks/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason: 'Rejected by admin' }),
+    });
+  } else if (status === 'suspended') {
+    await apiRequest(`/admin/banks/${id}/suspend`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason: 'Suspended by admin' }),
+    });
+  } else {
+    throw new Error(`Unsupported bank status: ${status}`);
+  }
+  return { id, status };
 });
 
 export const updateEventStatusApi = createAsyncThunk('data/updateEventStatusApi', async ({ id, status }) => {
@@ -520,8 +531,9 @@ const dataSlice = createSlice({
         state.notifications.forEach(n => n.read = true);
       })
       .addCase(updateBankStatusApi.fulfilled, (state, action) => {
-        const idx = state.bloodBanks.findIndex(b => b.id === action.payload.id);
-        if (idx !== -1) state.bloodBanks[idx].status = action.payload.status;
+        const { id, status } = action.payload;
+        const idx = state.bloodBanks.findIndex((b) => b.id === id);
+        if (idx !== -1) state.bloodBanks[idx].status = status;
       })
       .addCase(updateEventStatusApi.fulfilled, (state, action) => {
         const idx = state.events.findIndex(e => e.id === action.payload.id);

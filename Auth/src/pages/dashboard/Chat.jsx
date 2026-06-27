@@ -170,7 +170,7 @@ export default function Chat() {
         toast.success('Chat deleted');
         setThreadMessages([]);
         fetchChats();
-      } catch (error) {
+      } catch {
         toast.error('Failed to delete chat');
       }
     }
@@ -209,10 +209,10 @@ export default function Chat() {
   }, [threadMessages]);
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-200 dark:border-zinc-800 overflow-hidden">
+    <div className="flex h-[calc(100vh-8rem)] glass-panel rounded-2xl overflow-hidden border border-white/40 dark:border-zinc-800">
 
       {/* Contact List */}
-      <div className="w-1/3 min-w-[220px] max-w-[280px] border-r border-gray-200 dark:border-zinc-800 flex flex-col bg-gray-50 dark:bg-zinc-900/80">
+      <div className="w-1/3 min-w-[220px] max-w-[280px] border-r border-gray-200/50 dark:border-zinc-800 flex flex-col bg-gray-50/80 dark:bg-zinc-900/80">
         <div className="p-4 border-b border-gray-200 dark:border-zinc-800 shrink-0">
           <h2 className="text-base font-bold text-gray-900 dark:text-white">Messages</h2>
           <p className="text-xs text-gray-400 mt-0.5">{allContacts.length} contacts</p>
@@ -264,7 +264,7 @@ export default function Chat() {
         {activeContact ? (
           <>
             {/* Header */}
-            <div className="p-4 border-b border-gray-200 dark:border-zinc-800 flex items-center justify-between bg-white dark:bg-zinc-900 shrink-0">
+            <div className="p-4 border-b border-gray-200/50 dark:border-zinc-800 flex items-center justify-between glass-panel shrink-0">
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400 font-bold">
@@ -306,7 +306,11 @@ export default function Chat() {
                         animate={{ opacity: 1, y: 0 }}
                         className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isMe ? 'bg-red-600 text-white rounded-br-none' : 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white rounded-bl-none border border-gray-100 dark:border-zinc-700'}`}>
+                         <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+                           isMe 
+                             ? 'bg-red-600 text-white rounded-br-none' 
+                             : 'glass-panel text-gray-900 dark:text-white rounded-bl-none'
+                         }`}>
                           <p>{msg.text}</p>
                           <span className={`text-[10px] mt-1 block ${isMe ? 'text-red-200' : 'text-gray-400'}`}>
                             {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -321,7 +325,7 @@ export default function Chat() {
             </div>
 
             {/* Input */}
-            <form onSubmit={handleSend} className="p-4 bg-white dark:bg-zinc-900 border-t border-gray-200 dark:border-zinc-800 flex gap-3 shrink-0">
+            <form onSubmit={handleSend} className="p-4 glass-panel border-t border-gray-200/50 dark:border-zinc-800 flex gap-3 shrink-0">
               <input
                 type="text"
                 placeholder={`Message ${activeContact.name}...`}

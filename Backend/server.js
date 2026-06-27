@@ -140,6 +140,16 @@ const csrfProtection = csrf({
   cookie: { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' },
 });
 
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === 'test') {
+    return next();
+  }
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    return csrfProtection(req, res, next);
+  }
+  next();
+});
+
 // 14. Maintenance mode (after CSRF, before routes)
 app.use(maintenanceMiddleware);
 
@@ -158,7 +168,10 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc));
 app.get('/api/v1/auth/csrf-token', csrfProtection, (req, res) => {
   res.status(200).json({ csrfToken: req.csrfToken() });
 });
-// Legacy path
+app.get('/api/v1/csrf-token', csrfProtection, (req, res) => {
+  res.status(200).json({ csrfToken: req.csrfToken() });
+});
+// Legacy paths
 app.get('/api/csrf-token', csrfProtection, (req, res) => {
   res.status(200).json({ csrfToken: req.csrfToken() });
 });
@@ -336,11 +349,20 @@ initializeSockets(io);
 
 // ─── Start server ─────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {
-  httpServer.listen(PORT, () => {
-    logger.info(`Blood4U API running in [${process.env.NODE_ENV}] on http://localhost:${PORT}`);
-    logger.info(`Health: http://localhost:${PORT}/api/health`);
-    logger.info(`Docs:   http://localhost:${PORT}/api/docs`);
-  });
+  httpServer
+    .listen(PORT, () => {
+      logger.info(`Blood4U API running in [${process.env.NODE_ENV}] on http://localhost:${PORT}`);
+      logger.info(`Health: http://localhost:${PORT}/api/health`);
+      logger.info(`Docs:   http://localhost:${PORT}/api/docs`);
+    })
+    .on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        logger.error(`Port ${PORT} is already in use. Stop the other process or set PORT in .env.`);
+      } else {
+        logger.error({ msg: 'Server failed to start', err: err.message, code: err.code });
+      }
+      process.exit(1);
+    });
 }
 
 // ─── Graceful shutdown (Section 2.1) ─────────────────────────────────────────

@@ -98,7 +98,7 @@ export default function BloodRequests() {
       try {
         await dispatch(deleteRequestApi(id)).unwrap();
         toast.success('Request deleted permanently');
-      } catch (err) {
+      } catch {
         toast.error('Failed to delete request');
       }
     }
@@ -129,8 +129,13 @@ export default function BloodRequests() {
       </div>
 
       {/* Search */}
-      <div className="bg-white dark:bg-zinc-900 px-4 py-3 rounded-xl shadow-sm border border-gray-200 dark:border-zinc-800 flex items-center gap-3">
-        <Search className="text-gray-400 shrink-0" size={18} />
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="glass-panel px-4 py-3 rounded-2xl flex items-center gap-3"
+      >
+        <Search className="text-red-500 shrink-0" size={18} />
         <input
           type="text"
           placeholder="Search by city, hospital, or blood group..."
@@ -138,14 +143,18 @@ export default function BloodRequests() {
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
         />
-      </div>
+        {searchTerm && (
+          <button onClick={() => setSearchTerm('')} className="text-gray-400 hover:text-red-500 transition-colors text-xs">✕</button>
+        )}
+      </motion.div>
 
       {/* Request Cards */}
       <div className="space-y-4">
         {filteredRequests.length === 0 ? (
-          <div className="py-16 text-center bg-white dark:bg-zinc-900 rounded-2xl border border-dashed border-gray-300 dark:border-zinc-700">
+          <div className="py-16 text-center glass-panel rounded-2xl border border-dashed border-gray-300 dark:border-zinc-700">
             <Activity className="mx-auto text-gray-300 dark:text-zinc-700 mb-3" size={40} />
             <p className="text-gray-500 dark:text-gray-400 font-medium">No blood requests found.</p>
+            <p className="text-sm text-gray-400 mt-1">Try a different search or create a new request.</p>
           </div>
         ) : (
           filteredRequests.map((req, i) => (
@@ -154,9 +163,9 @@ export default function BloodRequests() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className={`bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border flex flex-col md:flex-row gap-4 p-5 
-                ${req.urgent ? 'border-red-300 dark:border-red-700/60 ring-1 ring-red-200 dark:ring-red-900/30' : 'border-gray-200 dark:border-zinc-800 hover:border-red-200 dark:hover:border-red-900/40'}
-                transition-all`}
+              className={`clay-card flex flex-col md:flex-row gap-4 p-5 transition-all ${
+                req.urgent ? 'ring-2 ring-red-500/30 dark:ring-red-700/40' : 'hover:shadow-lg'
+              }`}
             >
               <div className="flex items-start gap-4 flex-1">
                 <div className="relative shrink-0">
@@ -240,7 +249,7 @@ export default function BloodRequests() {
               initial={{ opacity: 0, scale: 0.96, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 20 }}
-              className="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-2xl my-4 shadow-2xl border border-gray-200 dark:border-zinc-700"
+              className="glass-panel rounded-2xl w-full max-w-2xl my-4 shadow-2xl border border-white/40 dark:border-zinc-700"
             >
               {/* Modal Header */}
               <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-zinc-800">

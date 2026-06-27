@@ -27,7 +27,7 @@ const auditLogSchema = new mongoose.Schema({
   metadata:    { type: mongoose.Schema.Types.Mixed },
   ip:          { type: String },
   userAgent:   { type: String },
-  createdAt:   { type: Date, default: Date.now, index: true },
+  createdAt:   { type: Date, default: Date.now },
 });
 
 // Compound indexes for common admin queries

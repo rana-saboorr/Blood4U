@@ -20,10 +20,18 @@ const logger = winston.createLogger({
       : winston.format.combine(
           winston.format.colorize(),
           winston.format.printf(({ timestamp, level, message, stack, ...meta }) => {
+            let text = stack;
+            if (!text) {
+              if (message && typeof message === 'object') {
+                text = message.msg || message.err || JSON.stringify(message);
+              } else {
+                text = message;
+              }
+            }
             const metaStr = Object.keys(meta).length
               ? '\n  ' + JSON.stringify(meta, null, 2).replace(/\n/g, '\n  ')
               : '';
-            return `${timestamp} [${level}]: ${stack || message}${metaStr}`;
+            return `${timestamp} [${level}]: ${text}${metaStr}`;
           })
         )
   ),
