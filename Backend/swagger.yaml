@@ -1,0 +1,496 @@
+openapi: 3.0.3
+info:
+  title: Blood4U API
+  description: |
+    Production-ready REST API for the Blood4U Blood Donation Management System.
+    Provides endpoints for authentication, donor management, blood requests, blood banks,
+    community events, and real-time chat.
+  version: 2.0.0
+  contact:
+    name: Blood4U Support
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local Development
+  - url: https://your-production-domain.com/api
+    description: Production
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [user, donor, bankOwner, admin]
+        isVerified:
+          type: boolean
+
+    Donor:
+      type: object
+      properties:
+        _id:
+          type: string
+        userId:
+          type: string
+        fullName:
+          type: string
+        bloodGroup:
+          type: string
+          enum: [A+, A-, B+, B-, AB+, AB-, O+, O-]
+        city:
+          type: string
+        available:
+          type: boolean
+        donationCount:
+          type: integer
+        lastDonationDate:
+          type: string
+          format: date-time
+        badge:
+          type: string
+          enum: [Bronze, Silver, Gold]
+        isResting:
+          type: boolean
+
+    BloodRequest:
+      type: object
+      properties:
+        _id:
+          type: string
+        userId:
+          type: string
+        bloodGroup:
+          type: string
+        city:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected, fulfilled]
+        urgent:
+          type: boolean
+        matchedDonors:
+          type: array
+          items:
+            type: string
+
+    BloodBank:
+      type: object
+      properties:
+        _id:
+          type: string
+        name:
+          type: string
+        city:
+          type: string
+        contact:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        location:
+          type: object
+          properties:
+            type:
+              type: string
+            coordinates:
+              type: array
+              items:
+                type: number
+
+security:
+  - cookieAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: API is running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /csrf-token:
+    get:
+      summary: Get CSRF Token
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: CSRF token for mutating requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  csrfToken:
+                    type: string
+
+  /auth/signup/send-otp:
+    post:
+      summary: Send signup OTP
+      tags: [Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password, phone]
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                phone:
+                  type: string
+                  example: "03001234567"
+      responses:
+        '200':
+          description: OTP sent to email
+        '400':
+          description: Validation error
+        '409':
+          description: User already exists
+
+  /auth/signup/verify-otp:
+    post:
+      summary: Verify signup OTP and create account
+      tags: [Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp]
+              properties:
+                email:
+                  type: string
+                otp:
+                  type: string
+      responses:
+        '201':
+          description: Account created
+        '400':
+          description: Invalid or expired OTP
+        '429':
+          description: Too many failed attempts
+
+  /auth/login:
+    post:
+      summary: Login (username/email/phone)
+      tags: [Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier, password]
+              properties:
+                identifier:
+                  type: string
+                  description: username, email, or phone
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful, JWT set in httpOnly cookie
+        '401':
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      summary: Logout
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Logged out
+
+  /auth/me:
+    get:
+      summary: Get current user profile
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+
+  /auth/forgot-password/send-otp:
+    post:
+      summary: Send password reset OTP
+      tags: [Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: OTP sent
+
+  /donors:
+    get:
+      summary: Get all donors (filterable)
+      tags: [Donors]
+      parameters:
+        - in: query
+          name: bloodGroup
+          schema:
+            type: string
+        - in: query
+          name: city
+          schema:
+            type: string
+        - in: query
+          name: available
+          schema:
+            type: boolean
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of donors
+
+    post:
+      summary: Register as a blood donor
+      tags: [Donors]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Donor'
+      responses:
+        '201':
+          description: Donor registered
+        '409':
+          description: Already a donor
+
+  /donors/search:
+    get:
+      summary: Smart blood group matching engine
+      tags: [Donors]
+      parameters:
+        - in: query
+          name: bloodGroup
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: city
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Matched and scored donors
+
+  /donors/me:
+    get:
+      summary: Get own donor profile
+      tags: [Donors]
+      responses:
+        '200':
+          description: Donor profile
+
+    put:
+      summary: Update own donor profile
+      tags: [Donors]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Profile updated
+
+  /requests:
+    get:
+      summary: Get blood requests (role-based visibility)
+      tags: [Requests]
+      responses:
+        '200':
+          description: List of requests
+
+    post:
+      summary: Create a new blood request
+      tags: [Requests]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BloodRequest'
+      responses:
+        '201':
+          description: Request created and donors matched
+
+  /requests/{id}:
+    get:
+      summary: Get single request (owner/admin)
+      tags: [Requests]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Request details
+
+    patch:
+      summary: Update request status (admin)
+      tags: [Requests]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, approved, rejected, fulfilled]
+      responses:
+        '200':
+          description: Request updated
+
+    delete:
+      summary: Delete request (owner/admin)
+      tags: [Requests]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Request deleted
+
+  /banks:
+    get:
+      summary: Get all blood banks
+      tags: [Blood Banks]
+      responses:
+        '200':
+          description: List of blood banks
+
+    post:
+      summary: Register a blood bank
+      tags: [Blood Banks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BloodBank'
+      responses:
+        '201':
+          description: Blood bank submitted for approval
+
+  /events:
+    get:
+      summary: Get events (approved future + own)
+      tags: [Events]
+      responses:
+        '200':
+          description: List of events
+
+    post:
+      summary: Create a blood donation event
+      tags: [Events]
+      responses:
+        '201':
+          description: Event created
+
+  /chat:
+    get:
+      summary: Get all chat threads for current user
+      tags: [Chat]
+      responses:
+        '200':
+          description: Chat threads
+
+  /chat/{userId}:
+    get:
+      summary: Get messages with a specific user
+      tags: [Chat]
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chat messages

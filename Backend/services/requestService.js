@@ -1,0 +1,185 @@
+const BloodRequest = require('../models/BloodRequest');
+const Donor = require('../models/Donor');
+const requestRepository = require('../repositories/requestRepository');
+const donorRepository = require('../repositories/donorRepository');
+const { getCompatibleGroups } = require('../utils/bloodCompatibility');
+
+class RequestService {
+  async createRequest(user, body, io) {
+    // Prevent duplicate active requests (non-admin only)
+    if (user.role !== 'admin') {
+      const activeRequest = await requestRepository.findOne({
+        userId: user._id,
+        status: { $in: ['pending', 'approved'] },
+      });
+      if (activeRequest) {
+        const err = new Error('You already have an active blood request. Please complete or delete it first.');
+        err.status = 400;
+        throw err;
+      }
+    }
+
+    const status = (user.role === 'admin' || body.urgent) ? 'approved' : 'pending';
+    const request = await requestRepository.create({ ...body, userId: user._id, status });
+
+    // Auto match donors
+    const compatibleGroups = getCompatibleGroups(request.bloodGroup);
+    await donorRepository.reactivateExpiredCooldowns();
+    const matched = await donorRepository.findCompatibleForRequest({
+      compatibleGroups,
+      city: request.city,
+    });
+
+    request.matchedDonors = matched.map((d) => d._id);
+    await requestRepository.update(request);
+
+    io.emit('data:sync:command', { type: 'request' });
+
+    return { request, matchedDonors: matched };
+  }
+
+  async getRequests({ user, query }) {
+    const { status, city, bloodGroup, page = 1, limit = 20 } = query;
+    const filter = {};
+    const adminIds = await requestRepository.getAdminIds();
+    const baseStatuses = ['pending', 'approved'];
+    const ownerStatuses = ['pending', 'approved', 'rejected', 'fulfilled'];
+
+    if (user.role === 'admin') {
+      if (status) filter.status = status;
+    } else {
+      filter.userId = { $nin: adminIds };
+
+      if (user.role === 'user') {
+        filter.userId = user._id;
+        filter.status = { $in: status ? [status] : ownerStatuses };
+      } else if (user.role === 'donor') {
+        const donor = await donorRepository.findByUserId(user._id);
+        if (donor) {
+          filter.$or = [
+            { matchedDonors: donor._id, status: { $in: baseStatuses }, userId: { $nin: adminIds } },
+            { userId: user._id },
+          ];
+          if (status) filter.status = status;
+        } else {
+          filter.userId = user._id;
+        }
+      } else if (user.role === 'bankOwner') {
+        filter.status = 'approved';
+      } else {
+        filter.userId = user._id;
+      }
+    }
+
+    if (city) filter.city = { $regex: city, $options: 'i' };
+    if (bloodGroup) filter.bloodGroup = bloodGroup;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    return requestRepository.findWithFilters({ filter, skip, limit });
+  }
+
+  async getRequestById(id, user) {
+    const request = await BloodRequest.findById(id)
+      .populate('userId', 'username email')
+      .populate('matchedDonors', 'fullName bloodGroup city mobile available');
+
+    if (!request) throw new Error('Blood request not found.');
+
+    const requestUserId = request.userId._id ? request.userId._id.toString() : request.userId.toString();
+    const isOwner = user && requestUserId === user._id.toString();
+    if (!isOwner && (!user || user.role !== 'admin')) {
+      const err = new Error('Not authorized.');
+      err.status = 403;
+      throw err;
+    }
+    return request;
+  }
+
+  async updateRequest(id, body, io) {
+    const { status, urgent } = body;
+    const update = {};
+
+    if (status) {
+      const validStatuses = ['pending', 'approved', 'rejected', 'fulfilled'];
+      if (!validStatuses.includes(status)) {
+        throw new Error('Invalid status value.');
+      }
+      update.status = status;
+      update.rejectedAt = status === 'rejected' ? new Date() : null;
+    }
+
+    if (urgent !== undefined) update.urgent = urgent;
+
+    const request = await requestRepository.findByIdAndUpdate(id, { $set: update });
+    if (!request) throw new Error('Request not found.');
+
+    io.emit('data:sync:command', { type: 'request', id });
+    return request;
+  }
+
+  async donorDonateToRequest(requestId, user, body, io) {
+    const confirmed = body?.didDonate === true || body?.didDonate === 'true';
+
+    const request = await BloodRequest.findById(requestId)
+      .populate('userId', 'username')
+      .populate('matchedDonors', '_id');
+
+    if (!request) throw new Error('Request not found.');
+    if (!['pending', 'approved'].includes(request.status)) {
+      throw new Error('Request is not open for donation.');
+    }
+
+    const donor = await donorRepository.findByUserId(user._id);
+    if (!donor) {
+      const err = new Error('Donor profile not found.');
+      err.status = 403;
+      throw err;
+    }
+
+    const isMatched = (request.matchedDonors || []).some((d) => d._id.toString() === donor._id.toString());
+    if (!isMatched) {
+      const err = new Error('This request does not match your blood group.');
+      err.status = 403;
+      throw err;
+    }
+
+    if (donor.isResting) {
+      const err = new Error('You are in donation cooldown. Try again later.');
+      err.status = 403;
+      throw err;
+    }
+
+    if (!confirmed) {
+      return { message: 'Donation not confirmed.', request };
+    }
+
+    donor.donationCount += 1;
+    donor.lastDonationDate = new Date();
+    donor.available = false;
+    await donorRepository.update(donor);
+
+    request.status = 'fulfilled';
+    await requestRepository.update(request);
+
+    io.emit('data:sync:command', { type: 'request', id: request._id });
+    return { message: 'Donation logged.', request, donor };
+  }
+
+  async deleteRequest(id, user, io) {
+    const request = await requestRepository.findById(id);
+    if (!request) throw new Error('Request not found.');
+
+    const requestUserId = request.userId._id ? request.userId._id.toString() : request.userId.toString();
+    const isOwner = user && requestUserId === user._id.toString();
+    if (!isOwner && (!user || user.role !== 'admin')) {
+      const err = new Error('Not authorized.');
+      err.status = 403;
+      throw err;
+    }
+
+    await request.deleteOne();
+    io.emit('data:sync:command', { type: 'request' });
+  }
+}
+
+module.exports = new RequestService();
